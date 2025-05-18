@@ -63,15 +63,15 @@ load_results <- function(country, level, end_year, only_regular_season = TRUE) {
 load_mv <- function(league_id = NULL, year) {
   # Define the path to the consolidated RDS file
   mv_dir <- "./data/mv/"
-  rds_file <- file.path(mv_dir, "consolidated_mv_data.rds")
+  mv_file <- file.path(mv_dir, "consolidated_mv_data.csv")
 
   # Check if the RDS file exists
-  if (!file.exists(rds_file)) {
-    stop(paste("Consolidated MV data file not found:", rds_file))
+  if (!file.exists(mv_file)) {
+    stop(paste("Consolidated MV data file not found:", mv_file))
   }
 
   # Load the consolidated data
-  mv_data <- readRDS(rds_file)
+  mv_data <- read_csv(mv_file, show_col_types = FALSE)
 
   # Filter by year
   if (missing(year) || is.null(year)) {
