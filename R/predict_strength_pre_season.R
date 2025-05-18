@@ -7,7 +7,7 @@ library(tidyr)
 
 source("./R/load_data.R")
 
-predict_strength_pre_season <- function(leagues, league_id, end_year, years_back, mv_dir){
+predict_strength_pre_season <- function(leagues, league_id, end_year, years_back){
 
   league <- leagues[leagues$id == league_id, ]
   country <- league$country
@@ -95,7 +95,6 @@ predict_strength_pre_season <- function(leagues, league_id, end_year, years_back
                        models_fh = models_fh, # List of models
                        models_sh = models_sh, # List of models
                        ids_surrounding = ids_surrounding,
-                       mv_dir = mv_dir,
                        ignore_xg = ignore_xg)
   })
   df_hist_features <- bind_rows(dfs_features)
@@ -220,7 +219,6 @@ predict_strength_pre_season <- function(leagues, league_id, end_year, years_back
                                             models_fh = models_fh,
                                             models_sh = models_sh,
                                             ids_surrounding = ids_surrounding,
-                                            mv_dir = mv_dir,
                                             ignore_xg = ignore_xg)
 
   # Scale df_current_features using scaling parameters from df_hist_to_scale
@@ -567,7 +565,7 @@ calculate_xg_difference <- function(data, teams = NULL, ignore_xg_flag = FALSE) 
 create_season_data <- function(year, teams, league_id,
                                data_league, data_league_below,
                                models_fh, models_sh,
-                               ids_surrounding, mv_dir, ignore_xg){
+                               ids_surrounding, ignore_xg){
   # year: The season for which to create data (e.g., if predicting for 2023-24, year is 2024)
   # teams: list of teams in this 'year' for this league
 
@@ -667,21 +665,8 @@ create_season_data <- function(year, teams, league_id,
     mv_vec <- mv_res$avg_market_values
     avg_age_vec <- mv_res$avg_ages
   }
-  #
-  #
-  # # Turnover: compare current squad (mv_df_current_squad for 'year') with past season squad ('prev_season_year_num')
-  # # Past season squad data needs to be loaded for all surrounding leagues for 'prev_season_year_num'
-  # mvs_previous_list <- lapply(ids_surrounding, function(id_surr) {
-  #   prev_mv_file <- file.path(mv_dir, paste0("tm_mv_", id_surr, "_", prev_season_year_num, "_adj.csv"))
-  #   if (file.exists(prev_mv_file)) {
-  #     read_csv(prev_mv_file, show_col_types = FALSE)
-  #   } else {
-  #     warning(paste("MV file not found for previous season turnover calc:", prev_mv_file))
-  #     tibble() # Return empty tibble if file not found
-  #   }
-  # })
-  # mv_previous_combined <- bind_rows(mvs_previous_list)
 
+  # Turnover: compare current squad (mv_df_current_squad for 'year') with past season squad ('prev_season_year_num')
   mv_previous_surrounding <- load_mv(league_id = ids_surrounding, year = prev_season_year_num)
 
   turnover_vec <- get_turnover(data_past_season_all_leagues = mv_previous_surrounding,
