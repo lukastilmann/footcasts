@@ -62,7 +62,7 @@ load_results <- function(country, level, end_year, only_regular_season = TRUE) {
 
 load_mv <- function(league_id = NULL, year) {
   # Define the path to the consolidated RDS file
-  mv_dir <- "./data/squads_mv_adj/"
+  mv_dir <- "./data/mv/"
   rds_file <- file.path(mv_dir, "consolidated_mv_data.rds")
 
   # Check if the RDS file exists
