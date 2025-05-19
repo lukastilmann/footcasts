@@ -1,5 +1,5 @@
 # R/format_forecast_table.R
-format_forecast_table <- function(raw_forecast_df, league_id, season = NULL, regions_config_path = "./data/table_regions.csv") {
+format_forecast_table <- function(raw_forecast_df, league_id, season = NULL, regions_config_path = "../data/table_regions.csv") {
   # Helper for %||% (provides a default if a value is NULL)
   `%||%` <- function(a, b) if (!is.null(a)) a else b
 

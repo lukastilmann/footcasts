@@ -9,7 +9,7 @@ leagues_df <- NULL
 tryCatch({
   # Make sure the path to your CSV is correct.
   # If your app.R is in the main directory and 'data' is a subdirectory:
-  leagues_df <- read_csv("./data/leagues.csv", show_col_types = FALSE)
+  leagues_df <- read_csv("../data/leagues.csv", show_col_types = FALSE)
   if (!all(c("id", "name", "country", "level") %in% names(leagues_df))) {
     stop("Leagues CSV is missing required columns: id, name, country, level.")
   }
@@ -24,7 +24,7 @@ tryCatch({
     stringsAsFactors = FALSE
   )
   shiny::showNotification(
-    "Could not load './data/leagues.csv'. Using fallback league definitions. Please check the file path and content.",
+    "Could not load '../data/leagues.csv'. Using fallback league definitions. Please check the file path and content.",
     type = "warning",
     duration = NULL
   )

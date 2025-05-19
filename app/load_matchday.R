@@ -11,7 +11,7 @@ load_matchday_results <- function(country, level, end_year, matchday, only_regul
   if (length(end_year) == 1){
     # If file exists, load it from local storage
     # First, check if the data exists locally
-    file_path <- paste0("./data/results/", country, "_", level, "_", end_year, ".rds")
+    file_path <- paste0("../data/results/", country, "_", level, "_", end_year, ".rds")
     if (file.exists(file_path)) {
       load_local = TRUE
     }
