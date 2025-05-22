@@ -2,6 +2,8 @@ library(tidyverse)
 library(fs)
 library(readr)
 
+source("./config.R")
+
 # Function to extract league_id and year from filename
 extract_info_from_filename <- function(filename) {
   # Pattern: tm_mv_{league_id}_{year}_adj.csv
@@ -75,61 +77,19 @@ consolidate_mv_files <- function(mv_dir) {
     stop("No data could be read from the CSV files")
   }
 
-  # Create output filename
-  output_file <- file.path(mv_dir, "consolidated_mv_data.rds")
-
-  # Save as RDS
-  saveRDS(all_data, output_file)
-
-  message(sprintf("Successfully consolidated %d files into %s",
-                  length(csv_files), output_file))
   message(sprintf("Total rows: %d", nrow(all_data)))
 
   return(all_data)
 }
 
-write_results_data <- function(id, year){
 
-  leagues <- read.csv("./data/leagues.csv")
-  league <- leagues[leagues$id == id, ]
-  levels <- c("1st", "2nd", "3rd")
-
-  data <- data <- worldfootballR::fb_match_results(
-    country = league$country,
-    gender = "M",
-    season_end_year = year,
-    tier = levels[league$level]
-  )
-  write_rds(data, paste0("./data/results/", league$country, "_", league$level, "_", year, ".rds"))
-}
-
-# Usage example:
-# consolidated_data <- consolidate_mv_files(mv_dir)
-
-# Optional: Preview the structure of the consolidated data
-# glimpse(consolidated_data)
-
-# Optional: Check for any missing values in key columns
-# consolidated_data %>%
-#   summarise(
-#     missing_league_id = sum(is.na(league_id)),
-#     missing_season_end_year = sum(is.na(season_end_year)),
-#     total_rows = n()
-#   )
-
-consolidate_mv_files("./data/squads_mv_adj")
-
-# name check
-mv_data <- readRDS("./data/squads_mv_adj/consolidated_mv_data.rds")
+mv_data <- consolidate_mv_files("./data/processed/squads_mv_adj")
 mv_data <- mv_data %>%
   mutate(team_fbref = recode(team_fbref,
                              "Braunschweig" = "BTSV",
                              "M'Gladbach" = "Gladbach"
   ))
 
-write_rds(mv_data, "./data/squads_mv_adj/consolidated_mv_data.rds")
+write_csv(mv_data, CONFIG$paths$mv_consolidated)
 
-ids <- c(4, 9)
-for (id in ids){
-  write_results_data(id, 2025)
-}
+

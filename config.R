@@ -41,6 +41,7 @@ CONFIG <- list(
     results_data = file.path(root, "data", "results"),    # Note: no trailing slash
     strength_preds = file.path(root, "data", "processed", "strength_preds"),
     mv_data = file.path(root, "data", "processed", "squads_mv_adj"),
+    mv_consolidated = file.path(root, "data", "processed", "squads_mv_adj", "consolidated_mv_data.rds"),
     table_regions = file.path(root, "data", "table_regions.csv")
   )
 )
