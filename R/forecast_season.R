@@ -1,6 +1,11 @@
 
 forecast_season <- function(games_current_season, strength_pred,
-                            matchday, n_sims, update_rate, xG_weight,
+                            matchday, n_sims = 1000, update_rate = 0.05,
+                            xG_weight = 1,
+                            var_factor = 1.0,
+                            variance_decay_param = 0.1,
+                            mixture_weight_param = 0.05,
+                            mixture_start_matchday = 3,
                             decimal_places = 4) {
 
   # Check if xG data is available
@@ -14,10 +19,13 @@ forecast_season <- function(games_current_season, strength_pred,
     message("xG data not available, setting xG_weight to 0")
   }
 
-  # load model for pre-season
+  # Load model for pre-season
   model <- model_from_params(games_current_season, strength_pred)
 
-  # updating model on games up to matchday
+  # Store initial model for mixture modeling
+  initial_model <- model
+
+  # Updating model on games up to matchday
   if (matchday > 0) {
     for (week in seq(1, matchday)) {
       print(paste("Updating on results of week", week))
@@ -36,18 +44,56 @@ forecast_season <- function(games_current_season, strength_pred,
     }
   }
 
+  # Calculate mixture model if conditions are met
+  final_model <- model
+  if (matchday >= mixture_start_matchday) {
+    print(paste("Creating mixture model for matchday", matchday))
+
+    # Fit Cole-Dixon model on games played so far
+    games_played <- games_current_season %>%
+      filter(Wk <= matchday, !is.na(HomeGoals), !is.na(AwayGoals))
+
+    if (nrow(games_played) >= 10) {  # Minimum games to fit a reliable model
+      cd_model <- goalmodel(goals1 = games_played$HomeGoals,
+                            goals2 = games_played$AwayGoals,
+                            team1 = games_played$Home,
+                            team2 = games_played$Away,
+                            rs = TRUE)
+
+      # Calculate mixture weight: w_x = 1 - exp(-a_w^2) * x^2
+      mixture_weight <- 1 - exp(-(mixture_weight_param^2) * matchday^2)
+      print(paste("Mixture weight for CD model:", round(mixture_weight, 3)))
+
+      # Create mixed model parameters
+      final_model <- create_mixture_model(model, cd_model, mixture_weight)
+    } else {
+      print("Not enough games to fit Cole-Dixon model, using updating model only")
+    }
+  }
+
+  # Calculate variance scaling factors
+  # Variance decay: 1 / x^a_vd (for x > 0, use 1 for x = 0)
+  variance_decay_factor <- if (matchday == 0) 1 else 1 / (matchday^variance_decay_param)
+
+  # Apply variance scaling
+  scaled_att_var <- strength_pred$att_var * var_factor * variance_decay_factor
+  scaled_def_var <- strength_pred$def_var * var_factor * variance_decay_factor
+
+  print(paste("Variance decay factor:", round(variance_decay_factor, 3)))
+  print(paste("Scaled attack variance:", round(scaled_att_var, 4)))
+  print(paste("Scaled defense variance:", round(scaled_def_var, 4)))
+
   matches_unfinished <- games_current_season %>% filter(Wk > matchday)
   games_up_to_now <- games_current_season %>% filter(Wk <= matchday)
 
   # Store base model for resampling
-  base_model <- model
+  base_model <- final_model
 
   # Simulate n seasons with resampled team strengths
   simulation_results <- vector("list", n_sims)
   for (i in 1:n_sims) {
-    # Resample model parameters for each simulation
-    resampled_model <- resample_model(base_model, strength_pred$att_var,
-                                      strength_pred$def_var)
+    # Resample model parameters for each simulation with scaled variances
+    resampled_model <- resample_model(base_model, scaled_att_var, scaled_def_var)
 
     # Make predictions with resampled model
     preds <- predict_expg(resampled_model, team1 = matches_unfinished$Home,
@@ -97,6 +143,50 @@ forecast_season <- function(games_current_season, strength_pred,
   return(standing_probabilities)
 }
 
+
+# Helper function to create mixture model
+create_mixture_model <- function(updating_model, cd_model, mixture_weight) {
+  # mixture_weight is the weight for the Cole-Dixon model
+  # (1 - mixture_weight) is the weight for the updating model
+  mixed_model <- updating_model  # Start with updating model structure
+
+  # Get team names that exist in both models
+  updating_teams <- names(updating_model$parameters$attack)
+  cd_teams <- names(cd_model$parameters$attack)
+  common_teams <- intersect(updating_teams, cd_teams)
+
+  if (length(common_teams) == 0) {
+    warning("No common teams between updating and CD models, returning updating model")
+    return(updating_model)
+  }
+
+  # Mix attack parameters
+  mixed_attack <- updating_model$parameters$attack
+  mixed_attack[common_teams] <- (1 - mixture_weight) * updating_model$parameters$attack[common_teams] +
+    mixture_weight * cd_model$parameters$attack[common_teams]
+
+  # Mix defense parameters
+  mixed_defense <- updating_model$parameters$defense
+  mixed_defense[common_teams] <- (1 - mixture_weight) * updating_model$parameters$defense[common_teams] +
+    mixture_weight * cd_model$parameters$defense[common_teams]
+
+  # Mix other parameters (home advantage, intercept)
+  mixed_hfa <- (1 - mixture_weight) * updating_model$parameters$hfa +
+    mixture_weight * cd_model$parameters$hfa
+
+  mixed_intercept <- (1 - mixture_weight) * updating_model$parameters$intercept +
+    mixture_weight * cd_model$parameters$intercept
+
+  # Update mixed model parameters
+  mixed_model$parameters$attack <- mixed_attack
+  mixed_model$parameters$defense <- mixed_defense
+  mixed_model$parameters$hfa <- mixed_hfa
+  mixed_model$parameters$intercept <- mixed_intercept
+
+  return(mixed_model)
+}
+
+
 # Function to calculate points
 calculate_points <- function(home_goals, away_goals) {
   if (home_goals > away_goals) {
@@ -107,6 +197,7 @@ calculate_points <- function(home_goals, away_goals) {
     return(c(1, 1))  # Draw
   }
 }
+
 
 calculate_final_standing <- function(home, away, home_goals, away_goals) {
   # Determine the result of each match
@@ -156,6 +247,7 @@ calculate_final_standing <- function(home, away, home_goals, away_goals) {
   return(final_standings)
 }
 
+
 simulate_season <- function(preds, season_finished){
   home <- c(season_finished$Home, preds$team1)
   away <- c(season_finished$Away, preds$team2)
@@ -163,6 +255,7 @@ simulate_season <- function(preds, season_finished){
   away_goals <- c(season_finished$AwayGoals, rpois(nrow(preds), lambda = preds$expg2))
   calculate_final_standing(home, away, home_goals, away_goals)
 }
+
 
 model_from_params <- function(games, parameters){
   week_1_dummy <- games %>% filter(Wk < 10)
@@ -183,7 +276,9 @@ model_from_params <- function(games, parameters){
   model
 }
 
-resample_model <- function(model, att_var, def_var){
+
+# Modified resample_model function to use scaled variances
+resample_model <- function(model, scaled_att_var, scaled_def_var){
   # Create a deep copy of the model to avoid modifying the original
   resampled_model <- model
 
@@ -191,16 +286,16 @@ resample_model <- function(model, att_var, def_var){
   att_mean <- model$parameters$attack
   def_mean <- model$parameters$defense
 
-  # Sample new attack parameters from normal distribution
+  # Sample new attack parameters from normal distribution with scaled variance
   resampled_attack <- rnorm(n = length(att_mean),
                             mean = att_mean,
-                            sd = sqrt(att_var))
+                            sd = sqrt(scaled_att_var))
   names(resampled_attack) <- names(att_mean)
 
-  # Sample new defense parameters from normal distribution
+  # Sample new defense parameters from normal distribution with scaled variance
   resampled_defense <- rnorm(n = length(def_mean),
                              mean = def_mean,
-                             sd = sqrt(def_var))
+                             sd = sqrt(scaled_def_var))
   names(resampled_defense) <- names(def_mean)
 
   # Update the model with resampled parameters
@@ -209,6 +304,7 @@ resample_model <- function(model, att_var, def_var){
 
   return(resampled_model)
 }
+
 
 update_parameters <- function(home, away, home_goals, away_goals,
                               home_xG = NULL, away_xG = NULL,
