@@ -1,10 +1,12 @@
+source("./config.R")
+
 library(readr)
 library(dplyr)
 
 # Function to create forecasts for specified leagues and years
 create_forecasts <- function(league_ids, years) {
   # Read leagues data
-  leagues <- read_csv("./data/leagues.csv", show_col_types = FALSE)
+  leagues <- read_csv(CONFIG$paths$leagues_data, show_col_types = FALSE)
   leagues <- leagues[leagues$id %in% league_ids, ]
 
   # Create directories if they don't exist
@@ -18,7 +20,7 @@ create_forecasts <- function(league_ids, years) {
       print(paste("Processing league", league_id, "for year", year))
 
       # Check if strength prediction exists
-      strength_pred_file <- paste0("./data/processed/strength_preds/strength_pred_year_", year, "_league_", league_id, ".rds")
+      strength_pred_file <- get_strength_pred_path(year, league_id)
 
       if (!file.exists(strength_pred_file)) {
         print(paste("Creating strength prediction for league", league_id, "year", year))
@@ -41,15 +43,22 @@ create_forecasts <- function(league_ids, years) {
         completed_games <- results %>%
           filter(!is.na(HomeGoals) & !is.na(AwayGoals))
 
+        uncompleted_games <- results %>%
+          filter(is.na(HomeGoals) & is.na(AwayGoals))
+
         if (nrow(completed_games) > 0) {
-          max_matchday <- max(completed_games$Wk, na.rm = TRUE)
+          # Only matchdays where all games are completed
+          # TODO: At some point, updating and simulating shouldn't be dependant
+          # on fully completed matchdays
+          completed_weeks <- completed_games$Wk[!completed_games$Wk %in% uncompleted_games$Wk]
+          max_matchday <- max(completed_weeks, na.rm = TRUE)
           matchdays <- 0:max_matchday  # Include pre-season (0) up to last completed matchday
 
           print(paste("Creating forecasts for matchdays 0 to", max_matchday))
 
           # Create forecasts for each matchday
           for (matchday in matchdays) {
-            forecast_file <- paste0("./outputs/forecasts/forecast_year_", year, "_league_", league_id, "_matchday_", matchday, ".rds")
+            forecast_file <- get_forecast_path(year, league_id, matchday)
 
             if (!file.exists(forecast_file)) {
               print(paste("Creating forecast for matchday", matchday))
@@ -61,7 +70,7 @@ create_forecasts <- function(league_ids, years) {
           }
         } else {
           print("No completed games found. Creating pre-season forecast only.")
-          forecast_file <- paste0("./outputs/forecasts/forecast_year_", year, "_league_", league_id, "_matchday_0.rds")
+          forecast_file <- get_forecast_path(year, league_id, 0)
 
           if (!file.exists(forecast_file)) {
             forecast <- forecast_season(results, strength_pred, 0, 1000, 0.05, 1)

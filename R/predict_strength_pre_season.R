@@ -29,18 +29,6 @@ predict_strength_pre_season <- function(leagues, league_id, end_year, years_back
   strength_model_years <- seq(from = start_year -1, to = end_year - 1, by = 1)
   print(paste("Historical years for modeling:", paste(years, collapse=", ")))
 
-  # data_league <- as_tibble(fb_match_results(country = country, gender = "M", season_end_year = strength_model_years, tier = level)) %>%
-  #   select(Season_End_Year, Home, Away, HomeGoals, AwayGoals, Round, Wk, Home_xG, Away_xG) %>%
-  #   filter(Round == "Regular season" | is.na(Round) | Round == "") # Handle cases where Round might be NA or empty for some leagues
-  #
-  # if (!is.na(level_below)) {
-  #   data_below <- as_tibble(fb_match_results(country = country, gender = "M", season_end_year = strength_model_years, tier = level_below)) %>%
-  #     select(Season_End_Year, Home, Away, HomeGoals, AwayGoals, Round, Wk, Home_xG, Away_xG) %>%
-  #     filter(Round == "Regular season" | is.na(Round) | Round == "")
-  # } else {
-  #   data_below <- tibble() # Empty tibble if no league below
-  # }
-
   data_league <- as_tibble(load_results(country = country, end_year = strength_model_years, level = level))
 
   if (!is.na(level_below)) {
@@ -302,7 +290,9 @@ get_strength_models <- function(data_league_for_models, model_years){
   }
 
   models_fh <- lapply(model_years, function(year){
-    season_games <- data_league_for_models %>% filter(Season_End_Year == year)
+    season_games <- data_league_for_models %>%
+      filter(Season_End_Year == year) %>%
+      filter(!is.na(HomeGoals) & !is.na(AwayGoals))
     if (!is.na(season_length) && "Wk" %in% names(season_games) && sum(!is.na(as.numeric(season_games$Wk))) > 0) {
       season_games_fh <- season_games %>% filter(as.numeric(Wk) <= (season_length / 2))
     } else {
@@ -317,7 +307,9 @@ get_strength_models <- function(data_league_for_models, model_years){
   })
 
   models_sh <- lapply(model_years, function(year){
-    season_games <- data_league_for_models %>% filter(Season_End_Year == year)
+    season_games <- data_league_for_models %>%
+      filter(Season_End_Year == year) %>%
+      filter(!is.na(HomeGoals) & !is.na(AwayGoals))
     if (!is.na(season_length) && "Wk" %in% names(season_games) && sum(!is.na(as.numeric(season_games$Wk))) > 0) {
       season_games_sh <- season_games %>% filter(as.numeric(Wk) > (season_length / 2))
     } else {
@@ -332,7 +324,9 @@ get_strength_models <- function(data_league_for_models, model_years){
   })
 
   models_full <- lapply(model_years, function(year){
-    season_games <- data_league_for_models %>% filter(Season_End_Year == year)
+    season_games <- data_league_for_models %>%
+      filter(Season_End_Year == year) %>%
+      filter(!is.na(HomeGoals) & !is.na(AwayGoals))
     if(nrow(season_games) < 10) {
       warning(paste("Insufficient games for Full model in year", year))
       return(NULL)

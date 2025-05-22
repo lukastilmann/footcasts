@@ -3,13 +3,14 @@ library(shiny)
 library(readr)
 library(dplyr) # For filter and select
 
+source("../config.R")
+
 # --- Load static data ---
 # Attempt to load leagues data, handle potential errors
 leagues_df <- NULL
 tryCatch({
-  # Make sure the path to your CSV is correct.
-  # If your app.R is in the main directory and 'data' is a subdirectory:
-  leagues_df <- read_csv("../data/leagues.csv", show_col_types = FALSE)
+  # Loading leagues file
+  leagues_df <- read_csv(CONFIG$paths$leagues_data, show_col_types = FALSE)
   if (!all(c("id", "name", "country", "level") %in% names(leagues_df))) {
     stop("Leagues CSV is missing required columns: id, name, country, level.")
   }
@@ -30,12 +31,13 @@ tryCatch({
   )
 })
 
-# Filter for selectable leagues (IDs 4 and 9)
+# Filter for selectable leagues
 selectable_leagues <- leagues_df %>%
-  filter(id %in% c(4, 9))
+  filter(id %in% CONFIG$leagues$enabled_ids)
 
 if (nrow(selectable_leagues) == 0) {
-  stop("Configured league IDs (4, 9) not found in leagues.csv or fallback. App cannot start.")
+  stop(paste("Configured league IDs", paste(CONFIG$leagues$enabled_ids, collapse = ", "),
+             "not found in leagues.csv or fallback. App cannot start."))
 }
 
 # Create choices for the selectInput (names are league names, values are league ids)
@@ -51,7 +53,7 @@ source("load_matchday.R")
 
 # --- UI Definition ---
 ui <- fluidPage(
-  titlePanel("Football League Forecast - Season 2024/2025"),
+  titlePanel("Football League Forecast - 2024/2025"),
   sidebarLayout(
     sidebarPanel(
       selectInput("league", "Select League:",
@@ -72,19 +74,11 @@ ui <- fluidPage(
 # --- Server Definition ---
 server <- function(input, output, session) {
 
-  # Fixed year for the application
-  FORECAST_SEASON_END_YEAR <- 2025
-  # Number of matchdays in a season for these leagues (e.g., Bundesliga has 34)
-  # This could be made dynamic if leagues can have different numbers of matchdays
-  TOTAL_MATCHDAYS_IN_SEASON <- 34
-
-  # Update matchday choices reactively (e.g., if different leagues had different total matchdays)
-  # For now, it's fixed based on TOTAL_MATCHDAYS_IN_SEASON
-  observe({
-    updateSelectInput(session, "matchday",
-                      choices = c("Pre-Season", 1:TOTAL_MATCHDAYS_IN_SEASON),
-                      selected = input$matchday)
-  })
+  # For now, just return current season from config file
+  # at some point, seasons could be chosen
+  selected_season <- reactive(({
+    return(CONFIG$seasons$current)
+  }))
 
   # Helper to get league details from the loaded selectable_leagues
   get_selected_league_details <- reactive({
@@ -95,6 +89,15 @@ server <- function(input, output, session) {
     }
     shiny::showNotification(paste("Details for league ID", input$league, "not found."), type = "error")
     return(NULL)
+  })
+
+  # Update matchday choices reactively (since number of matchdays differs between leagues)
+  observe({
+    req(get_selected_league_details())
+    n_matchdays <- get_selected_league_details()$n_matchdays
+    updateSelectInput(session, "matchday",
+                      choices = c("Pre-Season", 1:n_matchdays),
+                      selected = input$matchday)
   })
 
   output$forecast_header <- renderText({
@@ -111,8 +114,8 @@ server <- function(input, output, session) {
     league_details <- get_selected_league_details()
     req(league_details)
 
-    # Forecast indices: 0 (Pre-Season) to TOTAL_MATCHDAYS_IN_SEASON
-    matchday_forecast_indices_to_load <- 0:(TOTAL_MATCHDAYS_IN_SEASON)
+    # Forecast indices: 0 (Pre-Season) to n_matchdays for that league
+    matchday_forecast_indices_to_load <- 0:(league_details$n_matchdays)
 
     loading_notification_id <- showNotification(
       paste("Loading all forecast data for", league_details$name, "..."),
@@ -125,7 +128,7 @@ server <- function(input, output, session) {
 
     for (md_forecast_idx in matchday_forecast_indices_to_load) {
       forecast_table <- get_forecast(
-        season_end_year = FORECAST_SEASON_END_YEAR,
+        season_end_year = as.numeric(selected_season()),
         league_id = as.numeric(selected_league_id),
         matchday_value = md_forecast_idx
       )
@@ -194,7 +197,7 @@ server <- function(input, output, session) {
     formatted_table <- format_forecast_table(
       raw_forecast_df = raw_data,
       league_id = league_details$id,
-      season = FORECAST_SEASON_END_YEAR
+      season = selected_season()
     )
     return(formatted_table)
   }, striped = TRUE, hover = TRUE, bordered = TRUE, spacing = 'm', width = 'auto', align = 'l')
@@ -221,7 +224,7 @@ server <- function(input, output, session) {
 
     specific_matchday_results <- load_matchday_results(league_details$country,
                                                        league_details$level,
-                                                       2025,
+                                                       selected_season(),
                                                        actual_matchday_number)
 
     if (nrow(specific_matchday_results) == 0) {

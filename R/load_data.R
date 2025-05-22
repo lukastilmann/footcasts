@@ -1,3 +1,5 @@
+source("./config.R")
+
 load_results <- function(country, level, end_year, only_regular_season = TRUE) {
   levels <- c("1st", "2nd", "3rd", "4th")
 
@@ -11,7 +13,7 @@ load_results <- function(country, level, end_year, only_regular_season = TRUE) {
   if (length(end_year) == 1){
     # If file exists, load it from local storage
     # First, check if the data exists locally
-    file_path <- paste0("./data/results/", country, "_", level, "_", end_year, ".rds")
+    file_path <- get_results_path(country, level, end_year)
     if (file.exists(file_path)) {
       load_local = TRUE
     }
@@ -62,8 +64,7 @@ load_results <- function(country, level, end_year, only_regular_season = TRUE) {
 
 load_mv <- function(league_id = NULL, year) {
   # Define the path to the consolidated RDS file
-  mv_dir <- "./data/mv/"
-  mv_file <- file.path(mv_dir, "consolidated_mv_data.csv")
+  mv_file <- CONFIG$paths$mv_data
 
   # Check if the RDS file exists
   if (!file.exists(mv_file)) {
