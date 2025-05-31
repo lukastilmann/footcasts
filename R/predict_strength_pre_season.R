@@ -1,12 +1,42 @@
-library(dplyr)
-library(ggplot2)
-library(goalmodel)
-library(readr)
-library(lubridate)
-library(tidyr)
 
-source("./R/load_data.R")
-
+#' Predict Pre-Season Team Strengths Using Historical Data
+#'
+#' Creates pre-season predictions of team attack and defense strengths using machine learning
+#' models trained on historical performance, market values, squad characteristics, and
+#' promotion/relegation status. Incorporates expected goals data when available and of sufficient quality.
+#'
+#' @param leagues Data frame containing league information with columns: id, country, level, etc.
+#' @param league_id Integer ID of the specific league to predict for
+#' @param end_year Integer season end year to predict (e.g., 2024 for 2023-24 season)
+#' @param years_back Integer number of historical years to use for model training
+#'
+#' @return List containing pre-season strength predictions:
+#'   \item{att_pred}{Named vector of predicted attack strengths for each team}
+#'   \item{def_pred}{Named vector of predicted defense strengths for each team}
+#'   \item{ha}{Average home advantage parameter}
+#'   \item{intercept}{Average intercept parameter}
+#'   \item{att_model}{Linear model object for attack predictions}
+#'   \item{def_model}{Linear model object for defense predictions}
+#'   \item{att_var}{Attack model variance for uncertainty quantification}
+#'   \item{def_var}{Defense model variance for uncertainty quantification}
+#'   \item{df_hist_scaled}{Scaled historical training data}
+#'   \item{df_current_scaled}{Scaled current season features}
+#'   \item{ignore_xg}{Logical indicating whether xG data was used}
+#'
+#' @details
+#' The function builds predictive models using features including:
+#' \itemize{
+#'   \item Previous season attack/defense strengths (first and second half)
+#'   \item Market value and age statistics (top 18 players)
+#'   \item Squad turnover between seasons
+#'   \item Promotion/relegation indicators
+#'   \item Expected goals performance (when available and >95% complete)
+#' }
+#'
+#' Models are trained on historical data and automatically handle missing xG data,
+#' promotion/relegation scenarios, and scaling of features.
+#'
+#' @export
 predict_strength_pre_season <- function(leagues, league_id, end_year, years_back){
 
   league <- leagues[leagues$id == league_id, ]

@@ -1,10 +1,5 @@
 #!/usr/bin/env Rscript
 
-source("./config.R")
-
-# Source necessary functions
-source("./R/write_results.R")
-
 # Define which leagues and years to process
 league_ids <- CONFIG$leagues$enabled_ids  # league ids as set by config file
 years <- c(CONFIG$seasons$available)       # seasons for which to load results

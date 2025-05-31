@@ -62,7 +62,7 @@ data/results/
 outputs/
 
 #also ignore debugging file
-R/debug.R
+**/debug.R
 
 # Allow reference files to be tracked (if you add this folder later)
 # !reference/

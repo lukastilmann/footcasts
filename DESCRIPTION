@@ -1,42 +1,30 @@
 Package: footcasts
-Title: What the Package Does (One Line, Title Case)
-Version: 0.0.0.9000
-Authors@R: 
-    person("First", "Last", , "first.last@example.com", role = c("aut", "cre"),
-           comment = c(ORCID = "YOUR-ORCID-ID"))
-Description: What the package does (one paragraph).
-License: `use_mit_license()`, `use_gpl3_license()` or friends to pick a
-    license
-Encoding: UTF-8
-Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.3.1
-
-Package: Footcasts
 Title: Football Match Result Prediction System
 Version: 0.1.0
-Authors@R:
-person("Lukas Tilmann", email = "lukastilmann97@gmail.com", role = c("aut", "cre"))
+Authors@R: person("Lukas", "Tilmann", email = "lukastilmann97@gmail.com", role = c("aut", "cre"))
 Description: A system for predicting football match results and league standings.
-Uses historical match data, player market values, and team statistics to
-forecast match outcomes and final league positions. Includes a Shiny app for
-visualizing predictions.
 Encoding: UTF-8
 LazyData: true
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.1
-Imports:
-worldfootballR,
-dplyr,
-tidyr,
-purrr,
-readr,
-ggplot2,
-goalmodel,
-fs,
-lubridate,
-stringdist,
-clue,
-shiny
+Imports: 
+  worldfootballR,
+  dplyr,
+  magrittr,
+  tidyr,
+  purrr,
+  readr,
+  ggplot2,
+  goalmodel,
+  fs,
+  lubridate,
+  stringdist,
+  clue,
+  shiny,
+  future,
+  furrr
 Suggests:
-devtools,
-testthat
+  devtools,
+  testthat
+Depends: 
+    R (>= 2.10)

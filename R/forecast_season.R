@@ -1,4 +1,57 @@
-
+#' Forecast Season Standings Using Team Strength Predictions
+#'
+#' Simulates the remainder of a football season based on current results and
+#' pre-season team strength predictions, incorporating Bayesian updating of
+#' team parameters through completed matchdays.
+#'
+#' @param games_current_season A data frame containing match results for the current season.
+#'   Must include columns: Home, Away, HomeGoals, AwayGoals, Wk (matchday).
+#'   Optional columns: Home_xG, Away_xG (expected goals data).
+#' @param strength_pred A list containing pre-season strength predictions with elements:
+#'   att_pred (attack strengths), def_pred (defense strengths), ha (home advantage),
+#'   intercept, att_var (attack variance), def_var (defense variance).
+#' @param matchday Integer specifying the last completed matchday to update model parameters.
+#'   Use 0 for pre-season forecasts without any completed games.
+#' @param n_sims Integer number of Monte Carlo simulations to run (default: 1000).
+#' @param update_rate Numeric learning rate for Bayesian parameter updates after each matchday (0-1).
+#' @param xG_weight Numeric weight for incorporating expected goals data (0-1).
+#'   0 = use only actual goals, 1 = use only xG data. Automatically set to 0 if xG data unavailable.
+#' @param decimal_places Integer number of decimal places for rounding probabilities and statistics (default: 4).
+#'
+#' @return A data frame with final season standings probabilities containing:
+#'   \item{team}{Team names}
+#'   \item{avg_standing}{Average final league position across simulations}
+#'   \item{sd_standing}{Standard deviation of final positions}
+#'   \item{prob_1, prob_2, ...}{Probability of finishing in each position (1st, 2nd, etc.)}
+#' @export
+#'
+#' @details
+#' The function operates in three main phases:
+#' \enumerate{
+#'   \item Creates initial model from pre-season strength predictions
+#'   \item Updates model parameters using Bayesian learning on completed matchdays
+#'   \item Simulates remaining fixtures with parameter uncertainty via resampling
+#' }
+#'
+#' Parameter updating uses prediction errors to adjust team attack and defense strengths.
+#' When xG data is available and xG_weight > 0, it blends actual goals with expected goals.
+#' Each simulation resamples team parameters from their posterior distributions to account
+#' for parameter uncertainty.
+#'
+#' @examples
+#' \dontrun{
+#' # Pre-season forecast
+#' forecast <- forecast_season(games_data, strength_predictions,
+#'                           matchday = 0, n_sims = 1000,
+#'                           update_rate = 0.05, xG_weight = 0.5)
+#'
+#' # Mid-season forecast after 10 matchdays
+#' forecast <- forecast_season(games_data, strength_predictions,
+#'                           matchday = 10, n_sims = 500,
+#'                           update_rate = 0.03, xG_weight = 0.8)
+#' }
+#'
+#' @seealso \code{\link{predict_strength_pre_season}} for generating strength predictions
 forecast_season <- function(games_current_season, strength_pred,
                             matchday, n_sims = 1000, update_rate = 0.05,
                             xG_weight = 1,
@@ -6,7 +59,8 @@ forecast_season <- function(games_current_season, strength_pred,
                             variance_decay_param = 0.1,
                             mixture_weight_param = 0.05,
                             mixture_start_matchday = 3,
-                            decimal_places = 4) {
+                            decimal_places = 4,
+                            verbose = TRUE) {
 
   # Check if xG data is available
   has_xG <- all(c("Home_xG", "Away_xG") %in% names(games_current_season)) &&
@@ -16,7 +70,9 @@ forecast_season <- function(games_current_season, strength_pred,
   # Set xG_weight to 0 if no xG data available
   if (!has_xG) {
     xG_weight <- 0
-    message("xG data not available, setting xG_weight to 0")
+    if (verbose){
+      message("xG data not available, setting xG_weight to 0")
+    }
   }
 
   # Load model for pre-season
@@ -28,7 +84,9 @@ forecast_season <- function(games_current_season, strength_pred,
   # Updating model on games up to matchday
   if (matchday > 0) {
     for (week in seq(1, matchday)) {
-      print(paste("Updating on results of week", week))
+      if (verbose){
+        print(paste("Updating on results of week", week))
+      }
       results <- games_current_season %>% filter(Wk == week)
 
       # Only pass xG if available
@@ -46,15 +104,18 @@ forecast_season <- function(games_current_season, strength_pred,
 
   # Calculate mixture model if conditions are met
   final_model <- model
+  #TODO: check if mixture component for DC is above threshold, then don't update
   if (matchday >= mixture_start_matchday) {
-    print(paste("Creating mixture model for matchday", matchday))
+    if (verbose){
+      print(paste("Creating mixture model for matchday", matchday))
+    }
 
     # Fit Cole-Dixon model on games played so far
     games_played <- games_current_season %>%
       filter(Wk <= matchday, !is.na(HomeGoals), !is.na(AwayGoals))
 
     if (nrow(games_played) >= 10) {  # Minimum games to fit a reliable model
-      cd_model <- goalmodel(goals1 = games_played$HomeGoals,
+      cd_model <- goalmodel::goalmodel(goals1 = games_played$HomeGoals,
                             goals2 = games_played$AwayGoals,
                             team1 = games_played$Home,
                             team2 = games_played$Away,
@@ -62,7 +123,9 @@ forecast_season <- function(games_current_season, strength_pred,
 
       # Calculate mixture weight: w_x = 1 - exp(-a_w^2) * x^2
       mixture_weight <- 1 - exp(-(mixture_weight_param^2) * matchday^2)
-      print(paste("Mixture weight for CD model:", round(mixture_weight, 3)))
+      if (verbose){
+        print(paste("Mixture weight for CD model:", round(mixture_weight, 3)))
+      }
 
       # Create mixed model parameters
       final_model <- create_mixture_model(model, cd_model, mixture_weight)
@@ -79,9 +142,11 @@ forecast_season <- function(games_current_season, strength_pred,
   scaled_att_var <- strength_pred$att_var * var_factor * variance_decay_factor
   scaled_def_var <- strength_pred$def_var * var_factor * variance_decay_factor
 
-  print(paste("Variance decay factor:", round(variance_decay_factor, 3)))
-  print(paste("Scaled attack variance:", round(scaled_att_var, 4)))
-  print(paste("Scaled defense variance:", round(scaled_def_var, 4)))
+  if (verbose){
+    print(paste("Variance decay factor:", round(variance_decay_factor, 3)))
+    print(paste("Scaled attack variance:", round(scaled_att_var, 4)))
+    print(paste("Scaled defense variance:", round(scaled_def_var, 4)))
+  }
 
   matches_unfinished <- games_current_season %>% filter(Wk > matchday)
   games_up_to_now <- games_current_season %>% filter(Wk <= matchday)
@@ -96,7 +161,7 @@ forecast_season <- function(games_current_season, strength_pred,
     resampled_model <- resample_model(base_model, scaled_att_var, scaled_def_var)
 
     # Make predictions with resampled model
-    preds <- predict_expg(resampled_model, team1 = matches_unfinished$Home,
+    preds <- goalmodel::predict_expg(resampled_model, team1 = matches_unfinished$Home,
                           team2 = matches_unfinished$Away,
                           return_df = TRUE)
 
@@ -187,67 +252,6 @@ create_mixture_model <- function(updating_model, cd_model, mixture_weight) {
 }
 
 
-# Function to calculate points
-calculate_points <- function(home_goals, away_goals) {
-  if (home_goals > away_goals) {
-    return(c(3, 0))  # Home win
-  } else if (home_goals < away_goals) {
-    return(c(0, 3))  # Away win
-  } else {
-    return(c(1, 1))  # Draw
-  }
-}
-
-
-calculate_final_standing <- function(home, away, home_goals, away_goals) {
-  # Determine the result of each match
-  points <- t(mapply(calculate_points, home_goals, away_goals))
-  home_points <- points[,1]
-  away_points <- points[,2]
-
-  season <- data.frame(Home = home, Away = away, HomeGoals = home_goals,
-                       AwayGoals = away_goals, HomePoints = home_points,
-                       AwayPoints = away_points)
-
-  # Calculate points and goal difference for home games
-  home_stats <- season %>%
-    group_by(Home) %>%
-    summarise(
-      points = sum(HomePoints),
-      goals_for = sum(HomeGoals),
-      goals_against = sum(AwayGoals)
-    )
-
-  # Calculate points and goal difference for away games
-  away_stats <- season %>%
-    group_by(Away) %>%
-    summarise(
-      points = sum(AwayPoints),
-      goals_for = sum(AwayGoals),
-      goals_against = sum(HomeGoals)
-    )
-
-  # Combine home and away stats
-  season_stats <- full_join(home_stats, away_stats, by = c("Home" = "Away")) %>%
-    mutate(
-      team = Home,
-      points = points.x + points.y,
-      goals_for = goals_for.x + goals_for.y,
-      goals_against = goals_against.x + goals_against.y,
-      goal_difference = goals_for - goals_against
-    ) %>%
-    select(team, points, goal_difference)
-
-  # Sort by points (descending) and then by goal difference (descending)
-  final_standings <- season_stats %>%
-    arrange(desc(points), desc(goal_difference)) %>%
-    mutate(standing = row_number()) %>%
-    select(standing, team, points, goal_difference)
-
-  return(final_standings)
-}
-
-
 simulate_season <- function(preds, season_finished){
   home <- c(season_finished$Home, preds$team1)
   away <- c(season_finished$Away, preds$team2)
@@ -261,7 +265,7 @@ model_from_params <- function(games, parameters){
   week_1_dummy <- games %>% filter(Wk < 10)
   week_1_dummy$HomeGoals <- 1
   week_1_dummy$AwayGoals <- 0
-  model <- goalmodel(goals1 = week_1_dummy$HomeGoals,
+  model <- goalmodel::goalmodel(goals1 = week_1_dummy$HomeGoals,
                      goals2 = week_1_dummy$AwayGoals,
                      team1 = week_1_dummy$Home,
                      team2 = week_1_dummy$Away,
@@ -315,7 +319,7 @@ update_parameters <- function(home, away, home_goals, away_goals,
     xG_weight <- 0
   }
 
-  preds <- predict_expg(model, home, away, return_df = TRUE)
+  preds <- goalmodel::predict_expg(model, home, away, return_df = TRUE)
 
   if (xG_weight > 0){
     home_goals <- (1 - xG_weight) * home_goals + xG_weight * home_xG
