@@ -4,6 +4,7 @@ Version: 0.1.0
 Authors@R: person("Lukas", "Tilmann", email = "lukastilmann97@gmail.com", role = c("aut", "cre"))
 Description: A system for predicting football match results and league standings.
 Encoding: UTF-8
+License: MIT
 LazyData: true
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.1
@@ -22,9 +23,22 @@ Imports:
   clue,
   shiny,
   future,
-  furrr
+  furrr,
+  np
 Suggests:
   devtools,
   testthat
 Depends: 
     R (>= 2.10)
+Collate: 
+    'calculate_final_standing.R'
+    'config-utils.R'
+    'create_forecasts.R'
+    'data-utils.R'
+    'forecast_season.R'
+    'tpe_surrogate.R'
+    'hpoptimize.R'
+    'load_data.R'
+    'predict_strength_pre_season.R'
+    'score_forecast_rps.R'
+    'score_hyperparameters.R'

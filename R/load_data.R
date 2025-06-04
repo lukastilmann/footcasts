@@ -83,10 +83,12 @@ load_results <- function(country, level, end_year, only_regular_season = TRUE) {
 #'
 #' @return Data frame with market value data containing player information,
 #'   market values, ages, team assignments, league_id, and season_end_year
+#' @importFrom readr read_csv
+#'
 #' @export
 load_mv <- function(league_id = NULL, year) {
   # Define the path to the consolidated RDS file
-  mv_file <- CONFIG$paths$mv_data
+  mv_file <- CONFIG$paths$mv_consolidated
 
   # Check if the RDS file exists
   if (!file.exists(mv_file)) {

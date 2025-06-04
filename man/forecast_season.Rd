@@ -8,6 +8,7 @@ forecast_season(
   games_current_season,
   strength_pred,
   matchday,
+  prev_model = NULL,
   n_sims = 1000,
   update_rate = 0.05,
   xG_weight = 1,
@@ -15,7 +16,8 @@ forecast_season(
   variance_decay_param = 0.1,
   mixture_weight_param = 0.05,
   mixture_start_matchday = 3,
-  decimal_places = 4
+  decimal_places = 4,
+  verbose = TRUE
 )
 }
 \arguments{
@@ -38,6 +40,8 @@ Use 0 for pre-season forecasts without any completed games.}
 0 = use only actual goals, 1 = use only xG data. Automatically set to 0 if xG data unavailable.}
 
 \item{decimal_places}{Integer number of decimal places for rounding probabilities and statistics (default: 4).}
+
+\item{verbose}{Logical controlling whether print statements are used to update on progress.}
 }
 \value{
 A data frame with final season standings probabilities containing:

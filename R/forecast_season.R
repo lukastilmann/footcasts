@@ -17,6 +17,7 @@
 #' @param xG_weight Numeric weight for incorporating expected goals data (0-1).
 #'   0 = use only actual goals, 1 = use only xG data. Automatically set to 0 if xG data unavailable.
 #' @param decimal_places Integer number of decimal places for rounding probabilities and statistics (default: 4).
+#' @param verbose Logical controlling whether print statements are used to update on progress.
 #'
 #' @return A data frame with final season standings probabilities containing:
 #'   \item{team}{Team names}
@@ -52,8 +53,10 @@
 #' }
 #'
 #' @seealso \code{\link{predict_strength_pre_season}} for generating strength predictions
-forecast_season <- function(games_current_season, strength_pred,
-                            matchday, n_sims = 1000, update_rate = 0.05,
+forecast_season <- function(games_current_season, strength_pred, matchday,
+                            prev_model = NULL,
+                            n_sims = 1000,
+                            update_rate = 0.05,
                             xG_weight = 1,
                             var_factor = 1.0,
                             variance_decay_param = 0.1,
@@ -75,63 +78,15 @@ forecast_season <- function(games_current_season, strength_pred,
     }
   }
 
-  # Load model for pre-season
-  model <- model_from_params(games_current_season, strength_pred)
-
-  # Store initial model for mixture modeling
-  initial_model <- model
-
-  # Updating model on games up to matchday
-  if (matchday > 0) {
-    for (week in seq(1, matchday)) {
-      if (verbose){
-        print(paste("Updating on results of week", week))
-      }
-      results <- games_current_season %>% filter(Wk == week)
-
-      # Only pass xG if available
-      if (has_xG) {
-        model <- update_parameters(results$Home, results$Away, results$HomeGoals,
-                                   results$AwayGoals, results$Home_xG,
-                                   results$Away_xG, model, update_rate, xG_weight)
-      } else {
-        model <- update_parameters(results$Home, results$Away, results$HomeGoals,
-                                   results$AwayGoals, NULL, NULL,
-                                   model, update_rate, 0)
-      }
-    }
+  if (mixture_start_matchday < 3){
+    stop("Mixture start matchday should be 3 or larger so enough data to fit model is present.")
+    mixture_start_matchday <- 3
   }
 
-  # Calculate mixture model if conditions are met
-  final_model <- model
-  #TODO: check if mixture component for DC is above threshold, then don't update
-  if (matchday >= mixture_start_matchday) {
-    if (verbose){
-      print(paste("Creating mixture model for matchday", matchday))
-    }
-
-    # Fit Cole-Dixon model on games played so far
-    games_played <- games_current_season %>%
-      filter(Wk <= matchday, !is.na(HomeGoals), !is.na(AwayGoals))
-
-    if (nrow(games_played) >= 10) {  # Minimum games to fit a reliable model
-      cd_model <- goalmodel::goalmodel(goals1 = games_played$HomeGoals,
-                            goals2 = games_played$AwayGoals,
-                            team1 = games_played$Home,
-                            team2 = games_played$Away,
-                            rs = TRUE)
-
-      # Calculate mixture weight: w_x = 1 - exp(-a_w^2) * x^2
-      mixture_weight <- 1 - exp(-(mixture_weight_param^2) * matchday^2)
-      if (verbose){
-        print(paste("Mixture weight for CD model:", round(mixture_weight, 3)))
-      }
-
-      # Create mixed model parameters
-      final_model <- create_mixture_model(model, cd_model, mixture_weight)
-    } else {
-      print("Not enough games to fit Cole-Dixon model, using updating model only")
-    }
+  # Calculate mixture weight: w_x = 1 - exp(-a_w^2) * x^2
+  mixture_weight <- 1 - exp(-(mixture_weight_param^2) * (max(0, matchday - mixture_start_matchday))^2)
+  if (verbose){
+    print(paste("Mixture weight for CD model:", round(mixture_weight, 3)))
   }
 
   # Calculate variance scaling factors
@@ -146,6 +101,71 @@ forecast_season <- function(games_current_season, strength_pred,
     print(paste("Variance decay factor:", round(variance_decay_factor, 3)))
     print(paste("Scaled attack variance:", round(scaled_att_var, 4)))
     print(paste("Scaled defense variance:", round(scaled_def_var, 4)))
+  }
+
+  # Creating model for predicting matches
+  if (matchday >= mixture_start_matchday) {
+    # Fit Dixon-Coles model on games played so far
+    games_played <- games_current_season %>%
+      filter(Wk <= matchday, !is.na(HomeGoals), !is.na(AwayGoals))
+
+    dc_model <- goalmodel::goalmodel(goals1 = games_played$HomeGoals,
+                                     goals2 = games_played$AwayGoals,
+                                     team1 = games_played$Home,
+                                     team2 = games_played$Away,
+                                     rs = TRUE)
+  }
+
+  if (matchday < mixture_start_matchday || mixture_weight < 0.95){
+    if (matchday > 0){
+      if (!is.null(prev_model)){
+        results <- games_current_season %>% filter(Wk == matchday)
+        upd_model <- update_parameters(results$Home, results$Away,
+                                       results$HomeGoals, results$AwayGoals,
+                                       results$Home_xG, results$Away_xG,
+                                       prev_model, update_rate, xG_weight)
+      } else {
+        # Load model for pre-season
+        upd_model <- model_from_params(games_current_season, strength_pred)
+
+        for (week in seq(1, matchday)) {
+          if (verbose){
+            print(paste("Updating on results of week", week))
+          }
+          results <- games_current_season %>% filter(Wk == week)
+
+          # Only pass xG if available
+          if (has_xG) {
+            upd_model <- update_parameters(results$Home, results$Away, results$HomeGoals,
+                                           results$AwayGoals, results$Home_xG,
+                                           results$Away_xG, upd_model, update_rate, xG_weight)
+          } else {
+            upd_model <- update_parameters(results$Home, results$Away, results$HomeGoals,
+                                           results$AwayGoals, NULL, NULL,
+                                           upd_model, update_rate, 0)
+          }
+        }
+      }
+    } else {
+      upd_model <- model_from_params(games_current_season, strength_pred)
+      }
+    # Setting model here even if no results exist so it can be returned for later matchdays
+  }
+
+  # Mixing models if enough matchdays have been played. Otherwise, just use updating model.
+  # When mixture weight is near 1, only use that.
+  if (matchday >= mixture_start_matchday) {
+    if (mixture_weight < 0.95){
+      # Create mixed model parameters
+      final_model <- create_mixture_model(upd_model, dc_model, mixture_weight)
+      if (verbose){
+        print(paste("Creating mixture model for matchday", matchday))
+      }
+    } else {
+      final_model <- dc_model
+    }
+  } else {
+    final_model <- upd_model
   }
 
   matches_unfinished <- games_current_season %>% filter(Wk > matchday)
@@ -205,7 +225,15 @@ forecast_season <- function(games_current_season, strength_pred,
   standing_probabilities$avg_standing <- round(standing_probabilities$avg_standing, decimal_places)
   standing_probabilities$sd_standing <- round(standing_probabilities$sd_standing, decimal_places)
 
-  return(standing_probabilities)
+  # Setting upd model to null
+  if (!exists("upd_model")) upd_model <- NULL
+
+  return(list(
+    standing_probabilities = standing_probabilities,
+    upd_model = upd_model
+    )
+  )
+
 }
 
 

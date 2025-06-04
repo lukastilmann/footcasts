@@ -1,16 +1,9 @@
 #!/usr/bin/env Rscript
 
-source("./config.R")
-
 # Load necessary libraries
 library(readr)
 library(dplyr)
 
-# Source necessary functions
-source("./R/predict_strength_pre_season.R")
-source("./R/forecast_season.R")
-source("./R/load_data.R")
-source("./R/create_forecasts.R")
 
 # Define which leagues and years to process
 league_ids <- CONFIG$leagues$enabled_ids  # league ids as set by config file

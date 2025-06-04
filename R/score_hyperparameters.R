@@ -11,15 +11,6 @@
 score_hyperparameters <- function(hyperparams, n_sims, years, league_ids,
                                   parallel = FALSE, max_cores = NULL) {
 
-  # Validate hyperparameters
-  required_params <- c("update_rate", "xG_weight", "var_factor",
-                       "variance_decay_param", "mixture_weight_param",
-                       "mixture_start_matchday")
-  missing_params <- setdiff(required_params, names(hyperparams))
-  if (length(missing_params) > 0) {
-    stop(paste("Missing hyperparameters:", paste(missing_params, collapse = ", ")))
-  }
-
   # Load leagues data once
   leagues <- readr::read_csv(CONFIG$paths$leagues_data, show_col_types = FALSE)
 
@@ -39,6 +30,18 @@ score_hyperparameters <- function(hyperparams, n_sims, years, league_ids,
 
   if (nrow(league_year_combos) == 0) {
     stop("No valid league-year combinations to evaluate")
+  }
+
+  # Ensure that strength predictions exist in non-parallel fashion
+  for (i in 1:nrow(league_year_combos)){
+    year <- league_year_combos$year[i]
+    league_id <- league_year_combos$league_id[i]
+    strength_pred_file <- get_strength_pred_path(year, league_id)
+    if (!file.exists(strength_pred_file)) {
+      print(paste("Creating and saving strength prediction for league", league_id, "year", year))
+      strength_pred <- predict_strength_pre_season(leagues, league_id, year, 5)
+      saveRDS(strength_pred, strength_pred_file)
+    }
   }
 
   # Define function to score a single league-year
@@ -95,29 +98,33 @@ score_hyperparameters <- function(hyperparams, n_sims, years, league_ids,
       # Score each matchday
       matchday_scores <- list()
 
+      prev_model <- NULL
+
       for (matchday in 0:(max_matchday - 1)) {
         #print(paste("Scoring matchday", matchday))
 
+        forecast_args <- list(
+          games_current_season = results,
+          strength_pred = strength_pred,
+          matchday = matchday,
+          prev_model = prev_model,
+          n_sims = n_sims,
+          verbose = FALSE
+        )
+
+        forecast_args <- c(hyperparams, forecast_args)
+
         # Create forecast
-        forecast <- tryCatch({
-          forecast_season(
-            games_current_season = results,
-            strength_pred = strength_pred,
-            matchday = matchday,
-            n_sims = n_sims,
-            update_rate = hyperparams$update_rate,
-            xG_weight = hyperparams$xG_weight,
-            var_factor = hyperparams$var_factor,
-            variance_decay_param = hyperparams$variance_decay_param,
-            mixture_weight_param = hyperparams$mixture_weight_param,
-            mixture_start_matchday = hyperparams$mixture_start_matchday,
-            verbose = FALSE
-          )
+        ret <- tryCatch({
+          do.call(forecast_season, forecast_args)
         }, error = function(e) {
           warning(paste("Error in forecast_season for league", league_id,
                         "year", year, "matchday", matchday, ":", e$message))
           return(NULL)
         })
+
+        forecast <- ret$standing_probabilities
+        prev_model <- ret$prev_model
 
         if (is.null(forecast)) next
 
