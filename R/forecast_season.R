@@ -109,11 +109,20 @@ forecast_season <- function(games_current_season, strength_pred, matchday,
     games_played <- games_current_season %>%
       filter(Wk <= matchday, !is.na(HomeGoals), !is.na(AwayGoals))
 
-    dc_model <- goalmodel::goalmodel(goals1 = games_played$HomeGoals,
-                                     goals2 = games_played$AwayGoals,
-                                     team1 = games_played$Home,
-                                     team2 = games_played$Away,
-                                     rs = TRUE)
+    dc_model <- tryCatch({
+      goalmodel::goalmodel(goals1 = games_played$HomeGoals,
+                           goals2 = games_played$AwayGoals,
+                           team1 = games_played$Home,
+                           team2 = games_played$Away,
+                           rs = TRUE)
+    }, error = function(e) {
+      # Log the error if verbose
+      if (verbose) {
+        message(sprintf("DC model failed for league %d year %d matchday %d: %s",
+                        league_id, year, matchday, e$message))
+      }
+      NULL  # Return NULL to indicate failure
+    })
   }
 
   if (matchday < mixture_start_matchday || mixture_weight < 0.95){
@@ -154,7 +163,7 @@ forecast_season <- function(games_current_season, strength_pred, matchday,
 
   # Mixing models if enough matchdays have been played. Otherwise, just use updating model.
   # When mixture weight is near 1, only use that.
-  if (matchday >= mixture_start_matchday) {
+  if (matchday >= mixture_start_matchday && !is.null(dc_model)) {
     if (mixture_weight < 0.95){
       # Create mixed model parameters
       final_model <- create_mixture_model(upd_model, dc_model, mixture_weight)

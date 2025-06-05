@@ -101,7 +101,6 @@ score_hyperparameters <- function(hyperparams, n_sims, years, league_ids,
       prev_model <- NULL
 
       for (matchday in 0:(max_matchday - 1)) {
-        #print(paste("Scoring matchday", matchday))
 
         forecast_args <- list(
           games_current_season = results,
@@ -252,21 +251,21 @@ score_hyperparameters <- function(hyperparams, n_sims, years, league_ids,
   }
 
   weighted_scores <- sapply(all_scores, function(x) x$weighted_score)
-  total_score <- sum(weighted_scores)
+  mean_score <- mean(weighted_scores)
 
   # Add detailed information as attributes
-  attr(total_score, "n_evaluations") <- length(all_scores)
-  attr(total_score, "score_details") <- all_scores
-  attr(total_score, "hyperparams") <- hyperparams
-  attr(total_score, "errors") <- errors
+  attr(mean_score, "n_evaluations") <- length(all_scores)
+  attr(mean_score, "score_details") <- all_scores
+  attr(mean_score, "hyperparams") <- hyperparams
+  attr(mean_score, "errors") <- errors
 
   # Summary statistics
   raw_scores <- sapply(all_scores, function(x) x$raw_rps)
 
-  attr(total_score, "summary") <- list(
+  attr(mean_score, "summary") <- list(
     mean_raw_rps = mean(raw_scores),
     sd_raw_rps = sd(raw_scores),
-    mean_weighted_score = mean(weighted_scores),
+    sum_weighted_score = sum(weighted_scores),
     sd_weighted_score = sd(weighted_scores),
     leagues_evaluated = unique(sapply(all_scores, function(x) x$league_id)),
     years_evaluated = unique(sapply(all_scores, function(x) x$year)),
@@ -275,8 +274,8 @@ score_hyperparameters <- function(hyperparams, n_sims, years, league_ids,
     n_errors = length(errors)
   )
 
-  print(paste("Total score:", round(total_score, 4),
+  print(paste("Total score:", round(mean_score, 4),
               "from", length(all_scores), "evaluations"))
 
-  return(total_score)
+  return(mean_score)
 }

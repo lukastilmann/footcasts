@@ -3,7 +3,7 @@ devtools::install(quick = TRUE, quiet = FALSE)
 library(footcasts)
 
 param_bounds <- list(
-  update_rate = c(0.01, 0.3),
+  update_rate = c(0.01, 0.2),
   # Any tests indicated that only using xG is ideal, so omitted for now
   #xG_weight = c(0, 1),
   var_factor = c(0.1, 3),
@@ -27,11 +27,12 @@ results <- hpoptimize(
   league_ids = CONFIG$leagues$enabled_ids,
   param_bounds = param_bounds,
   param_types = param_types,
-  n_initial = 64,
+  checkpoint_dir = "test_2",
+  n_initial = 32,
   initial_budget = 25,
   halving_proportion = 0.5,
   gamma = 0.2,
   n_rounds = 4,
-  parallel = FALSE,
+  parallel = TRUE,
   bw_factor = 1.5
 )
