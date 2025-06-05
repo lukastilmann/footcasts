@@ -360,10 +360,15 @@ update_parameters <- function(home, away, home_goals, away_goals,
   errors <- c(home_error, away_error)
   # which attack it belongs to
   names(errors) <- c(home, away)
-  attack_updated <- model$parameters$attack - log(1 + (update_size * errors[names(model$parameters$attack)])) / 2
+  update <- update_size * errors[names(model$parameters$attack)]
+  update <- min(0.99, update)
+  attack_updated <- model$parameters$attack + log(1 - update) / 2
+
 
   names(errors) <- c(away, home)
-  defense_updated <- model$parameters$defense + log(1 + (update_size * errors[names(model$parameters$defense)])) / 2
+  update <- update_size * errors[names(model$parameters$defense)]
+  update <- min(0.99, update)
+  defense_updated <- model$parameters$defense - log(1 - update) / 2
 
   # Update model parameters
   model$parameters$attack <- attack_updated
