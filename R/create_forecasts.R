@@ -1,9 +1,26 @@
-source("./config.R")
-
-library(readr)
-library(dplyr)
-
-# Function to create forecasts for specified leagues and years
+#' Create Season Forecasts for Multiple Leagues and Years
+#'
+#' Generates pre-season strength predictions and incremental forecasts for each
+#' completed matchday across specified leagues and years. Saves all outputs to disk
+#' and skips existing files to enable resumable batch processing.
+#'
+#' @param league_ids Integer vector of league IDs to process
+#' @param years Integer vector of years (season end years) to process
+#'
+#' @return NULL (invisible). Function called for side effects of creating forecast files.
+#' @export
+#'
+#' @details
+#' For each league-year combination:
+#' \itemize{
+#'   \item Creates or loads pre-season strength predictions
+#'   \item Identifies completed matchdays (where all fixtures are finished)
+#'   \item Generates incremental forecasts from matchday 0 (pre-season) through last completed matchday
+#'   \item Saves forecasts as RDS files using standardized file paths
+#' }
+#'
+#' Uses fixed simulation parameters: 1000 simulations, 0.05 update rate, xG weight of 1.
+#' Creates necessary output directories automatically.
 create_forecasts <- function(league_ids, years) {
   # Read leagues data
   leagues <- read_csv(CONFIG$paths$leagues_data, show_col_types = FALSE)

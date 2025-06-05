@@ -61,6 +61,12 @@ data/processed/
 data/results/
 outputs/
 
+# Hyperparameter optimization runs
+runs/
+
+#also ignore debugging file
+**/debug.R
+
 # Allow reference files to be tracked (if you add this folder later)
 # !reference/
 

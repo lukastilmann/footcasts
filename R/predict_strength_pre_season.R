@@ -1,12 +1,44 @@
-library(dplyr)
-library(ggplot2)
-library(goalmodel)
-library(readr)
-library(lubridate)
-library(tidyr)
 
-source("./R/load_data.R")
-
+#' Predict Pre-Season Team Strengths Using Historical Data
+#'
+#' Creates pre-season predictions of team attack and defense strengths using machine learning
+#' models trained on historical performance, market values, squad characteristics, and
+#' promotion/relegation status. Incorporates expected goals data when available and of sufficient quality.
+#'
+#' @param leagues Data frame containing league information with columns: id, country, level, etc.
+#' @param league_id Integer ID of the specific league to predict for
+#' @param end_year Integer season end year to predict (e.g., 2024 for 2023-24 season)
+#' @param years_back Integer number of historical years to use for model training
+#'
+#' @return List containing pre-season strength predictions:
+#'   \item{att_pred}{Named vector of predicted attack strengths for each team}
+#'   \item{def_pred}{Named vector of predicted defense strengths for each team}
+#'   \item{ha}{Average home advantage parameter}
+#'   \item{intercept}{Average intercept parameter}
+#'   \item{att_model}{Linear model object for attack predictions}
+#'   \item{def_model}{Linear model object for defense predictions}
+#'   \item{att_var}{Attack model variance for uncertainty quantification}
+#'   \item{def_var}{Defense model variance for uncertainty quantification}
+#'   \item{df_hist_scaled}{Scaled historical training data}
+#'   \item{df_current_scaled}{Scaled current season features}
+#'   \item{ignore_xg}{Logical indicating whether xG data was used}
+#'
+#' @details
+#' The function builds predictive models using features including:
+#' \itemize{
+#'   \item Previous season attack/defense strengths (first and second half)
+#'   \item Market value and age statistics (top 18 players)
+#'   \item Squad turnover between seasons
+#'   \item Promotion/relegation indicators
+#'   \item Expected goals performance (when available and >95% complete)
+#' }
+#'
+#' Models are trained on historical data and automatically handle missing xG data,
+#' promotion/relegation scenarios, and scaling of features.
+#' @importFrom goalmodel goalmodel
+#' @importFrom readr read_csv
+#'
+#' @export
 predict_strength_pre_season <- function(leagues, league_id, end_year, years_back){
 
   league <- leagues[leagues$id == league_id, ]
@@ -24,7 +56,7 @@ predict_strength_pre_season <- function(leagues, league_id, end_year, years_back
 
   # Set years based on years_back
   # These are the seasons for which we have FULL data to model and create historical features
-  start_year <- max(2019, end_year - years_back)
+  start_year <- max(2020, end_year - years_back)
   years <- seq(from = start_year, to = end_year - 1, by = 1)
   strength_model_years <- seq(from = start_year -1, to = end_year - 1, by = 1)
   print(paste("Historical years for modeling:", paste(years, collapse=", ")))
@@ -262,6 +294,20 @@ predict_strength_pre_season <- function(leagues, league_id, end_year, years_back
 }
 
 
+#' Generate Strength Models for Football Seasons
+#'
+#' Creates first half (FH), second half (SH), and full season goalmodels for specified years.
+#' Automatically determines season length and splits games accordingly.
+#'
+#' @param data_league_for_models Data frame with match data pre-filtered for relevant years
+#' @param model_years Numeric vector of season end years to create models for
+#'
+#' @return List containing three named lists (models_fh, models_sh, models_full),
+#'   each with goalmodel objects for the specified years
+#'
+#' @importFrom dplyr filter group_by summarise pull %>%
+#' @importFrom goalmodel goalmodel
+#' @keywords internal
 get_strength_models <- function(data_league_for_models, model_years){
   # data_league_for_models should be pre-filtered for relevant years
 
@@ -342,6 +388,21 @@ get_strength_models <- function(data_league_for_models, model_years){
   return(list(models_fh = models_fh, models_sh = models_sh, models_full = models_full))
 }
 
+
+#' Get Market Value and Age Data for Teams
+#'
+#' Calculates average market value and age for top 18 players per team
+#' based on a reference date at season start.
+#'
+#' @param data Data frame containing player market value and birth date information
+#' @param teams Character vector of team names to calculate statistics for
+#' @param season_start_year Numeric year when the season begins (e.g., 2022 for 2022-23 season)
+#'
+#' @return List with avg_market_values and avg_ages named vectors
+#'
+#' @importFrom dplyr filter arrange slice_head %>%
+#' @importFrom lubridate ymd years interval
+#' @keywords internal
 get_mv_data <- function(data, teams, season_start_year){
   # Calculate season start date (e.g., Aug 1st of the year the season begins)
   # If season_start_year is 2022, it means the 2022-2023 season.
@@ -403,6 +464,19 @@ get_mv_data <- function(data, teams, season_start_year){
 }
 
 
+#' Calculate Squad Turnover Between Seasons
+#'
+#' Determines how many of the current season's top 18 most valuable players
+#' are new compared to the previous season's roster.
+#'
+#' @param data_past_season_all_leagues Data frame with previous season market value data
+#' @param data_current_season_team Data frame with current season market value data
+#' @param teams Character vector of team names to calculate turnover for
+#'
+#' @return Named integer vector of turnover counts per team
+#'
+#' @importFrom dplyr filter arrange slice_head pull distinct %>%
+#' @keywords internal
 get_turnover <- function(data_past_season_all_leagues, data_current_season_team, teams){
   # data_past_season_all_leagues: combined MV data from previous season for relevant leagues
   # data_current_season_team: MV data for the current team for the current season
@@ -460,6 +534,20 @@ get_turnover <- function(data_past_season_all_leagues, data_current_season_team,
 }
 
 
+#' Calculate Expected Goals Difference from Actual Goals
+#'
+#' Computes per-game differences between expected goals (xG) and actual goals
+#' for both attacking and defensive metrics.
+#'
+#' @param data Data frame containing match data with xG columns
+#' @param teams Character vector of team names (optional, defaults to all teams in data)
+#' @param ignore_xg_flag Logical, if TRUE returns zeros instead of calculating xG metrics
+#'
+#' @return List with xG_pm (attack difference) and xGa_pm (defense difference) named vectors
+#'
+#' @importFrom dplyr mutate group_by summarise %>%
+#' @importFrom tidyr pivot_longer
+#' @keywords internal
 calculate_xg_difference <- function(data, teams = NULL, ignore_xg_flag = FALSE) {
   # If ignoring xG, return 0s and skip calculation
   if (ignore_xg_flag) {
@@ -556,6 +644,27 @@ calculate_xg_difference <- function(data, teams = NULL, ignore_xg_flag = FALSE) 
   ))
 }
 
+
+#' Create Season Data Matrix for Model Training
+#'
+#' Assembles all team-level features for a given season including previous season
+#' strength parameters, xG differences, promotion/relegation status, market values,
+#' average age, and squad turnover.
+#'
+#' @param year Numeric season end year to create data for
+#' @param teams Character vector of team names in the league for this season
+#' @param league_id League identifier for loading market value data
+#' @param data_league Data frame with current league's historical match data
+#' @param data_league_below Data frame with lower league's match data (for promotion detection)
+#' @param models_fh List of first half goalmodel objects by year
+#' @param models_sh List of second half goalmodel objects by year
+#' @param ids_surrounding Vector of league IDs for surrounding leagues (for turnover calculation)
+#' @param ignore_xg Logical, whether to ignore xG metrics and set to zero
+#'
+#' @return Data frame with one row per team containing all model features
+#'
+#' @importFrom dplyr filter %>%
+#' @keywords internal
 create_season_data <- function(year, teams, league_id,
                                data_league, data_league_below,
                                models_fh, models_sh,

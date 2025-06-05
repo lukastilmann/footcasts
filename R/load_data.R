@@ -1,5 +1,16 @@
-source("./config.R")
-
+#' Load Football Match Results Data
+#'
+#' Loads match results for a specific country, league level, and season.
+#' Attempts to load from local cache first, falls back to fetching from worldfootballR.
+#'
+#' @param country Character string of country code (e.g., "GER", "ENG")
+#' @param level Integer between 1-4 indicating league tier (1 = top division)
+#' @param end_year Integer or vector of season end years to load
+#' @param only_regular_season Logical whether to filter to regular season games only (default: TRUE)
+#'
+#' @return Data frame with match results containing columns: Season_End_Year, Home, Away,
+#'   HomeGoals, AwayGoals, Round, Wk, and optionally Home_xG, Away_xG
+#' @export
 load_results <- function(country, level, end_year, only_regular_season = TRUE) {
   levels <- c("1st", "2nd", "3rd", "4th")
 
@@ -61,10 +72,23 @@ load_results <- function(country, level, end_year, only_regular_season = TRUE) {
   return(data)
 }
 
-
+#' Load Market Value Data
+#'
+#' Loads consolidated market value data from RDS file, filtered by league and year.
+#' Data includes player market values, ages, and team information.
+#'
+#' @param league_id Integer or vector of league IDs to filter (optional).
+#'   If NULL, returns data for all leagues.
+#' @param year Integer or vector of season end years (required)
+#'
+#' @return Data frame with market value data containing player information,
+#'   market values, ages, team assignments, league_id, and season_end_year
+#' @importFrom readr read_csv
+#'
+#' @export
 load_mv <- function(league_id = NULL, year) {
   # Define the path to the consolidated RDS file
-  mv_file <- CONFIG$paths$mv_data
+  mv_file <- CONFIG$paths$mv_consolidated
 
   # Check if the RDS file exists
   if (!file.exists(mv_file)) {
