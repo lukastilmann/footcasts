@@ -54,6 +54,11 @@ create_forecasts <- function(league_ids, years) {
       league <- leagues[leagues$id == league_id, ]
       results <- load_results(league$country, league$level, year)
 
+      # Loading settings for forecasting algorithm
+      forecast_settings <- CONFIG$forecast_params
+      forecast_settings$games_current_season <- results
+      forecast_settings$strength_pred <- strength_pred
+
       # Find last completed matchday
       if (nrow(results) > 0) {
         # Filter to include only rows where both HomeGoals and AwayGoals are not NA
@@ -62,6 +67,8 @@ create_forecasts <- function(league_ids, years) {
 
         uncompleted_games <- results %>%
           filter(is.na(HomeGoals) & is.na(AwayGoals))
+
+        upd_model <- NULL
 
         if (nrow(completed_games) > 0) {
           # Only matchdays where all games are completed
@@ -79,9 +86,14 @@ create_forecasts <- function(league_ids, years) {
 
             if (!file.exists(forecast_file)) {
               print(paste("Creating forecast for matchday", matchday))
-              forecast <- forecast_season(results, strength_pred, matchday, 1000, 0.05, 1)
+              forecast_settings$matchday <- matchday
+              forecast_settings$prev_model <- upd_model
+              forecast_ret <- do.call(forecast_season, forecast_settings)
+              forecast <- forecast_ret$standing_probabilities
+              upd_model <- forecast_ret$upd_model
               saveRDS(forecast, forecast_file)
             } else {
+              upd_model <- NULL
               print(paste("Forecast already exists for matchday", matchday))
             }
           }
@@ -90,7 +102,9 @@ create_forecasts <- function(league_ids, years) {
           forecast_file <- get_forecast_path(year, league_id, 0)
 
           if (!file.exists(forecast_file)) {
-            forecast <- forecast_season(results, strength_pred, 0, 1000, 0.05, 1)
+            forecast_settings$matchday <- 0
+            forecast_ret <- do.call(forecast_season, forecast_settings)
+            forecast <- forecast_ret$standing_probabilities
             saveRDS(forecast, forecast_file)
           } else {
             print("Pre-season forecast already exists.")
