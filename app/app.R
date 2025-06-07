@@ -3,14 +3,14 @@ library(shiny)
 library(readr)
 library(dplyr) # For filter and select
 
-source("../config.R")
 
 # --- Load static data ---
 # Attempt to load leagues data, handle potential errors
 leagues_df <- NULL
 tryCatch({
   # Loading leagues file
-  leagues_df <- read_csv(CONFIG$paths$leagues_data, show_col_types = FALSE)
+  leagues_df <- load_leagues(from_app = TRUE)
+
   if (!all(c("id", "name", "country", "level") %in% names(leagues_df))) {
     stop("Leagues CSV is missing required columns: id, name, country, level.")
   }
@@ -151,7 +151,7 @@ server <- function(input, output, session) {
 
     if (files_found_count == 0 && length(matchday_forecast_indices_to_load) > 0) {
       showNotification(
-        paste("No forecast data files found for any matchday state in", league_details$name, "for the", FORECAST_SEASON_END_YEAR, "season."),
+        paste("No forecast data files found for any matchday state in", league_details$name, "for the", selected_season(), "season."),
         type = "warning", duration = 10
       )
       return(list("error" = data.frame(Message = paste("No forecast data found for", league_details$name))))

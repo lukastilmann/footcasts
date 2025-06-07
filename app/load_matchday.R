@@ -1,5 +1,3 @@
-source("../config.R")
-
 load_matchday_results <- function(country, level, end_year, matchday, only_regular_season = TRUE) {
   levels <- c("1st", "2nd", "3rd", "4th")
 
@@ -13,7 +11,7 @@ load_matchday_results <- function(country, level, end_year, matchday, only_regul
   if (length(end_year) == 1){
     # If file exists, load it from local storage
     # First, check if the data exists locally
-    file_path <- get_results_path(country, level, end_year)
+    file_path <- file.path("..", get_results_path(country, level, end_year))
     if (file.exists(file_path)) {
       load_local = TRUE
     }
