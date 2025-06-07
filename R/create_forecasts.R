@@ -52,7 +52,8 @@ create_forecasts <- function(league_ids, years) {
 
       # Get league info and results
       league <- leagues[leagues$id == league_id, ]
-      results <- load_results(league$country, league$level, year)
+      results <- load_results(end_year = year, country = league$country,
+                              level = league$level)
 
       # Loading settings for forecasting algorithm
       forecast_settings <- CONFIG$forecast_params
