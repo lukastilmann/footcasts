@@ -4,13 +4,17 @@
 \alias{load_mv}
 \title{Load Market Value Data}
 \usage{
-load_mv(league_id = NULL, year)
+load_mv(year, league_id = NULL, from_app = FALSE)
 }
 \arguments{
+\item{year}{Integer or vector of season end years (required)}
+
 \item{league_id}{Integer or vector of league IDs to filter (optional).
 If NULL, returns data for all leagues.}
 
-\item{year}{Integer or vector of season end years (required)}
+\item{from_app}{Logical indicating whether function is called from shiny app,
+in which case the working directory is different, and ".." needs to be
+appended to path.}
 }
 \value{
 Data frame with market value data containing player information,
