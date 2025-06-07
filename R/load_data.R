@@ -3,15 +3,32 @@
 #' Loads match results for a specific country, league level, and season.
 #' Attempts to load from local cache first, falls back to fetching from worldfootballR.
 #'
+#' @param end_year Integer or vector of season end years to load
 #' @param country Character string of country code (e.g., "GER", "ENG")
 #' @param level Integer between 1-4 indicating league tier (1 = top division)
-#' @param end_year Integer or vector of season end years to load
+#' @param league_id Integer indicating leage_id in leagues file.
 #' @param only_regular_season Logical whether to filter to regular season games only (default: TRUE)
+#' @param from_app Logical indicating whether function is called from shiny app,
+#'   in which case the working directory is different, and ".." needs to be
+#'   appended to path.
 #'
 #' @return Data frame with match results containing columns: Season_End_Year, Home, Away,
 #'   HomeGoals, AwayGoals, Round, Wk, and optionally Home_xG, Away_xG
 #' @export
-load_results <- function(country, level, end_year, only_regular_season = TRUE) {
+load_results <- function(end_year, country = NULL, level = NULL, league_id = NULL,
+                         only_regular_season = TRUE, from_app = FALSE) {
+
+  if (is.null(level) & (is.null(country) || is.null(level))){
+    stop("Both league_id and country or level are null.")
+  }
+
+  if (!is.null(league_id)){
+    leagues <- load_leagues(from_app = from_app)
+    league <- leagues[leagues$id == league_id]
+    level <- as.numeric(league$level)
+    country <- league$country
+  }
+
   levels <- c("1st", "2nd", "3rd", "4th")
 
   # Input checks for level
@@ -25,6 +42,11 @@ load_results <- function(country, level, end_year, only_regular_season = TRUE) {
     # If file exists, load it from local storage
     # First, check if the data exists locally
     file_path <- get_results_path(country, level, end_year)
+
+    if (from_app){
+      file_path <- file.path("..", file_path)
+    }
+
     if (file.exists(file_path)) {
       load_local = TRUE
     }
@@ -77,18 +99,25 @@ load_results <- function(country, level, end_year, only_regular_season = TRUE) {
 #' Loads consolidated market value data from RDS file, filtered by league and year.
 #' Data includes player market values, ages, and team information.
 #'
+#' @param year Integer or vector of season end years (required)
 #' @param league_id Integer or vector of league IDs to filter (optional).
 #'   If NULL, returns data for all leagues.
-#' @param year Integer or vector of season end years (required)
+#' @param from_app Logical indicating whether function is called from shiny app,
+#'   in which case the working directory is different, and ".." needs to be
+#'   appended to path.
 #'
 #' @return Data frame with market value data containing player information,
 #'   market values, ages, team assignments, league_id, and season_end_year
 #' @importFrom readr read_csv
 #'
 #' @export
-load_mv <- function(league_id = NULL, year) {
+load_mv <- function(year, league_id = NULL, from_app = FALSE) {
   # Define the path to the consolidated RDS file
   mv_file <- CONFIG$paths$mv_consolidated
+
+  if (from_app){
+    mv_file <- file.path("..", mv_file)
+  }
 
   # Check if the RDS file exists
   if (!file.exists(mv_file)) {
@@ -127,4 +156,25 @@ load_mv <- function(league_id = NULL, year) {
   }
 
   return(mv_data)
+}
+
+#' Load Leagues
+#'
+#' Loads file with info on leagues.
+#'
+#' @param from_app Logical indicating whether function is called from shiny app,
+#'   in which case the working directory is different, and ".." needs to be
+#'   appended to path.
+#'
+#' @return Data frame leagues data.
+#'
+#' @export
+load_leagues <- function(from_app = FALSE){
+  leagues_path <- CONFIG$paths$leagues_data
+
+  if (from_app){
+    leagues_path <- file.path("..", leagues_path)
+  }
+
+  read_csv(leagues_path, show_col_types = FALSE)
 }

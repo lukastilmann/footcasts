@@ -9,6 +9,7 @@ hpoptimize(
   years,
   param_bounds,
   param_types,
+  checkpoint_dir = NULL,
   n_initial = 64,
   initial_budget = 100,
   halving_proportion = 0.5,
@@ -32,6 +33,11 @@ provide a character vector of possible values.}
 \item{param_types}{A named list specifying the type of each parameter.
 Valid types are "continuous", "integer", or "factor". Names must
 match those in param_bounds.}
+
+\item{checkpoint_dir}{Directory path for saving checkpoints and logs.
+If NULL (default), no checkpointing is performed. If TRUE, creates
+a timestamped directory under runs/hpo/. If a character string,
+uses that as the specific checkpoint directory.}
 
 \item{n_initial}{Number of initial random configurations. Default is 64.}
 
@@ -78,6 +84,9 @@ learns from all previous evaluations to propose promising new configurations.
 The objective function calls \code{score_hyperparameters} internally with
 the specified hyperparameters, number of simulations, years, league IDs,
 and parallel setting.
+
+When checkpoint_dir is provided, the function saves progress after each
+evaluation and can resume from the last checkpoint if interrupted.
 }
 \examples{
 \dontrun{
@@ -96,12 +105,26 @@ param_types <- list(
   model_type = "factor"
 )
 
-# Run optimization for specific leagues and years
+# Run optimization with automatic run directory creation
 results <- hpoptimize(
   league_ids = c(1, 2, 3),
   years = 2018:2022,
   param_bounds = param_bounds,
   param_types = param_types,
+  checkpoint_dir = TRUE,  # Auto-create timestamped directory
+  n_initial = 64,
+  initial_budget = 100,
+  n_rounds = 4,
+  parallel = TRUE
+)
+
+# Or specify a custom checkpoint directory
+results <- hpoptimize(
+  league_ids = c(1, 2, 3),
+  years = 2018:2022,
+  param_bounds = param_bounds,
+  param_types = param_types,
+  checkpoint_dir = "runs/hpo/my_experiment",
   n_initial = 64,
   initial_budget = 100,
   n_rounds = 4,

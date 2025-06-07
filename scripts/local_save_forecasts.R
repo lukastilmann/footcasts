@@ -1,9 +1,6 @@
 #!/usr/bin/env Rscript
 
 # Load necessary libraries
-library(readr)
-library(dplyr)
-
 
 # Define which leagues and years to process
 league_ids <- CONFIG$leagues$enabled_ids  # league ids as set by config file

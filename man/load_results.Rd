@@ -4,16 +4,29 @@
 \alias{load_results}
 \title{Load Football Match Results Data}
 \usage{
-load_results(country, level, end_year, only_regular_season = TRUE)
+load_results(
+  end_year,
+  country = NULL,
+  level = NULL,
+  league_id = NULL,
+  only_regular_season = TRUE,
+  from_app = FALSE
+)
 }
 \arguments{
+\item{end_year}{Integer or vector of season end years to load}
+
 \item{country}{Character string of country code (e.g., "GER", "ENG")}
 
 \item{level}{Integer between 1-4 indicating league tier (1 = top division)}
 
-\item{end_year}{Integer or vector of season end years to load}
+\item{league_id}{Integer indicating leage_id in leagues file.}
 
 \item{only_regular_season}{Logical whether to filter to regular season games only (default: TRUE)}
+
+\item{from_app}{Logical indicating whether function is called from shiny app,
+in which case the working directory is different, and ".." needs to be
+appended to path.}
 }
 \value{
 Data frame with match results containing columns: Season_End_Year, Home, Away,

@@ -118,8 +118,8 @@ forecast_season <- function(games_current_season, strength_pred, matchday,
     }, error = function(e) {
       # Log the error if verbose
       if (verbose) {
-        message(sprintf("DC model failed for league %d year %d matchday %d: %s",
-                        league_id, year, matchday, e$message))
+        message(sprintf("DC model failed for matchday %d: %s",
+                        matchday, e$message))
       }
       NULL  # Return NULL to indicate failure
     })

@@ -1,10 +1,8 @@
-source("../config.R")
-
 # R/format_forecast_table.R
 format_forecast_table <- function(raw_forecast_df, league_id, season = NULL) {
 
   # Loading path for league regions from config file
-  regions_config_path <- CONFIG$paths$table_regions
+  regions_config_path <- file.path("..", CONFIG$paths$table_regions)
   # Helper for %||% (provides a default if a value is NULL)
   `%||%` <- function(a, b) if (!is.null(a)) a else b
 

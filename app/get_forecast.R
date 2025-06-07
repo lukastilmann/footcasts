@@ -1,11 +1,9 @@
-source("../config.R")
-
 # Function to retrieve forecast data for a specific matchday
 # This function can be adapted later for database queries.
 get_forecast <- function(season_end_year, league_id, matchday_value) {
 
   # file path from config
-  file_path <- CONFIG$paths$forecasts
+  file_path <- file.path("..", get_forecast_path(season_end_year, league_id, matchday_value))
 
   if (file.exists(file_path)) {
     tryCatch({
