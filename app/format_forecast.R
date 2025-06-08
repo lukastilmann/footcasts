@@ -1,4 +1,7 @@
 # R/format_forecast_table.R
+library(DT)
+library(magrittr)
+
 format_forecast_table <- function(raw_forecast_df, league_id, season = NULL) {
 
   # Loading path for league regions from config file
@@ -88,11 +91,7 @@ format_forecast_table <- function(raw_forecast_df, league_id, season = NULL) {
 
       # Add region probability to display dataframe with formatting
       column_name <- region_name
-      display_df[[column_name]] <- ifelse(
-        is.na(region_probs_sum),
-        "-",
-        paste0(as.character(round(region_probs_sum * 100)), "%")  # Integer percentage
-      )
+      display_df[[column_name]] <- round(region_probs_sum, 3)
     } else {
       # No valid probability columns for this region
       column_name <- region_name
@@ -100,5 +99,19 @@ format_forecast_table <- function(raw_forecast_df, league_id, season = NULL) {
     }
   }
 
-  return(display_df)
+  # Creating DT table
+  forecast_dt <- datatable(display_df, class = list(striped = FALSE),
+                           options = list(dom = "t", pageLength = nrow(raw_forecast_df)))
+
+  # Function to format cells with heatmap by color
+  brks <- rev(1 - seq(0, 1, length.out = 20)^2)
+  clrs <- round(seq(255, 40, length.out = length(brks) + 1), 0) %>%
+    {paste0("rgb(255,", ., ",", ., ")")}
+
+  # Creating heatmap and formatting numbers as percentages
+  forecast_dt <- forecast_dt %>%
+    formatStyle(league_regions$region_name,
+                backgroundColor = styleInterval(brks, clrs)) %>%
+    formatPercentage(columns = league_regions$region_name, digits = 1)
+  return(forecast_dt)
 }

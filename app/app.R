@@ -63,7 +63,7 @@ ui <- fluidPage(
     ),
     mainPanel(
       h3(textOutput("forecast_header")),
-      tableOutput("forecast_table"),
+      dataTableOutput("forecast_table"),
       hr(),
       uiOutput("results_header_ui"),
       tableOutput("matchday_results_table")
@@ -183,7 +183,26 @@ server <- function(input, output, session) {
     return(selected_df)
   })
 
-  output$forecast_table <- renderTable({
+  # output$forecast_table <- renderTable({
+  #   raw_data <- current_forecast_table_to_display()
+  #   league_details <- get_selected_league_details()
+  #   req(league_details)
+  #
+  #   # num_teams can be dynamically set if available in leagues_df or known.
+  #   # e.g. num_teams <- league_details$teams_count if such a column exists.
+  #   # For Bundesliga (ID 4) and 2. Bundesliga (ID 9), it's 18.
+  #   # format_forecast_table tries to infer this, so explicit passing is optional.
+  #   num_teams <- length(raw_data)
+  #
+  #   formatted_table <- format_forecast_table(
+  #     raw_forecast_df = raw_data,
+  #     league_id = league_details$id,
+  #     season = selected_season()
+  #   )
+  #   return(formatted_table)
+  # }, striped = TRUE, hover = TRUE, bordered = TRUE, spacing = 'm', width = 'auto', align = 'l')
+
+  output$forecast_table <- renderDT({
     raw_data <- current_forecast_table_to_display()
     league_details <- get_selected_league_details()
     req(league_details)
@@ -200,7 +219,7 @@ server <- function(input, output, session) {
       season = selected_season()
     )
     return(formatted_table)
-  }, striped = TRUE, hover = TRUE, bordered = TRUE, spacing = 'm', width = 'auto', align = 'l')
+  })
 
 
   # --- Matchday Results Section ---
