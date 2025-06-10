@@ -56,7 +56,8 @@ format_forecast_table <- function(raw_forecast_df, league_id, season = NULL) {
   # Initialize the display dataframe
   display_df <- data.frame(
     Team = raw_forecast_df$team,
-    `Average Standing` = round(raw_forecast_df$avg_standing, 1) # Rounded to 1 decimal place
+    `Average Standing` = round(raw_forecast_df$avg_standing, 1),
+    check.names = FALSE
   )
 
   rownames(display_df) <- 1:nrow(display_df)
@@ -100,8 +101,15 @@ format_forecast_table <- function(raw_forecast_df, league_id, season = NULL) {
   }
 
   # Creating DT table
-  forecast_dt <- datatable(display_df, class = list(striped = FALSE),
-                           options = list(dom = "t", pageLength = nrow(raw_forecast_df)))
+  forecast_dt <- datatable(display_df, class = list(striped = FALSE,
+                                                    compact = TRUE),
+                           options = list(dom = "t",
+                                          pageLength = nrow(raw_forecast_df),
+                                          columnDefs = list(
+                                            list(orderable = FALSE, targets = "Team")  # Disable sorting for first column (Team)
+                                            )
+                                          )
+                           )
 
   # Function to format cells with heatmap by color
   brks <- rev(1 - seq(0, 1, length.out = 20)^2)
