@@ -42,6 +42,7 @@ format_match_results <- function(results_df) {
       dom = 't',  # Show only table
       paging = FALSE,
       searching = FALSE,
+      ordering = FALSE,
       info = FALSE,
       columnDefs = list(
         list(className = 'dt-right', targets = 0),  # Right align home team
