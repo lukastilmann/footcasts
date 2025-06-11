@@ -1,3 +1,14 @@
+# Install and load footcasts package
+if (!require("footcasts", quietly = TRUE)) {
+  message("Installing footcasts package...")
+  if (!require("devtools", quietly = TRUE)) {
+    install.packages("devtools")
+  }
+  devtools::install("..", quiet = FALSE, upgrade = "never")
+  library(footcasts)
+}
+
+
 # Load required libraries
 library(shiny)
 library(readr)
