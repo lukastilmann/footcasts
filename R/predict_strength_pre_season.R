@@ -61,6 +61,7 @@ predict_strength_pre_season <- function(leagues, league_id, end_year, years_back
   strength_model_years <- seq(from = start_year -1, to = end_year - 1, by = 1)
   print(paste("Historical years for modeling:", paste(years, collapse=", ")))
 
+  browser()
   data_league <- as_tibble(load_results(country = country, end_year = strength_model_years, level = level))
 
   if (!is.na(level_below)) {
@@ -101,12 +102,14 @@ predict_strength_pre_season <- function(leagues, league_id, end_year, years_back
   # We are creating features for 'years'. For a given 'y' in 'years', we need model from 'y-1'.
   # The first year in 'years' is 'end_year - years_back'. Its features require model from 'end_year - years_back - 1'.
 
+  browser()
   dfs_features <- lapply(years, function(y){
     print(paste("Creating features for season:", y))
     # Get teams for year 'y'
     current_season_games <- data_league %>% filter(Season_End_Year == y)
     teams_for_year_y <- unique(c(current_season_games$Home, current_season_games$Away))
 
+    browser()
     create_season_data(year = y,
                        teams = teams_for_year_y,
                        league_id = league_id,
@@ -260,6 +263,7 @@ predict_strength_pre_season <- function(leagues, league_id, end_year, years_back
   }
 
 
+  print(df_current_scaled)
   att_pred <- predict(att_model, newdata=df_current_scaled)
   def_pred <- predict(def_model, newdata=df_current_scaled)
 

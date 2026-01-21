@@ -29,13 +29,10 @@ write_results_data <- function(id, year) {
   # Define tier levels
   levels <- c("1st", "2nd", "3rd")
 
-  # Fetch match results
-  data <- worldfootballR::fb_match_results(
-    country = league$country,
-    gender = "M",
-    season_end_year = year,
-    tier = levels[league$level]
-  )
+  data <- load_results(end_year = year,
+                       league_id = id)
+
+  data$Season_End_Year <- year
 
   # Generate output path using helper function
   output_path <- get_results_path(league$country, league$level, year)
