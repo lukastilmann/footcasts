@@ -64,14 +64,16 @@ source("load_matchday.R")
 
 # --- UI Definition ---
 ui <- fluidPage(
-  titlePanel("Football League Forecast - 2024/2025"),
+  titlePanel("Football League Forecasts"),
   sidebarLayout(
     sidebarPanel(
       width = 3,
       selectInput("league", "Select League:",
                   choices = league_choices), # Dynamically set choices
       selectInput("matchday", "Select Matchday:",
-                  choices = c("Pre-Season")) # Choices will be updated in server
+                  choices = c("Pre-Season")), # Choices will be updated in server
+      selectInput("season", "Select Season:",
+                  choices = c("2024/2025", "2025/2026"))
     ),
     mainPanel(
       width = 9,
@@ -90,7 +92,11 @@ server <- function(input, output, session) {
   # For now, just return current season from config file
   # at some point, seasons could be chosen
   selected_season <- reactive(({
-    return(CONFIG$seasons$current)
+    if(input$season == "2024/2025"){
+      return(2025)
+    }else{
+      CONFIG$seasons$current
+    }
   }))
 
   # Helper to get league details from the loaded selectable_leagues

@@ -22,6 +22,7 @@ Imports:
   stringdist,
   clue,
   shiny,
+  DT,
   future,
   furrr,
   np
@@ -29,7 +30,7 @@ Suggests:
   devtools,
   testthat
 Depends: 
-    R (>= 2.10)
+    R (>= 3.5)
 Collate: 
     'calculate_final_standing.R'
     'config-utils.R'
